@@ -31,8 +31,8 @@ namespace FetchRig3
         private string sessionPath;
         private string encodePipeName;
         private Size frameSize;
-        private Size streamFramesize;
         private ConcurrentQueue<ButtonCommands> camControlMessageQueue;
+        private ConcurrentQueue<RawMat> streamOutputQueue;
 
         // These fields will be accessed by an OryxCameraSettings object to set and save camera settings.
         public IManagedCamera managedCamera;
@@ -44,11 +44,12 @@ namespace FetchRig3
         readonly Size streamFrameSize;
         readonly int streamEnqueueDutyCycle;
 
-        public OryxCamera(int camNumber, IManagedCamera managedCamera, ConcurrentQueue<ButtonCommands> camControlMessageQueue, Util.OryxSetupInfo setupInfo, string sessionPath)
+        public OryxCamera(int camNumber, IManagedCamera managedCamera, ConcurrentQueue<ButtonCommands> camControlMessageQueue, ConcurrentQueue<RawMat> streamOutputQueue, Util.OryxSetupInfo setupInfo, string sessionPath)
         {
             this.camNumber = camNumber;
             this.managedCamera = managedCamera;
             this.camControlMessageQueue = camControlMessageQueue;
+            this.streamOutputQueue = streamOutputQueue;
             this.setupInfo = setupInfo;
             this.sessionPath = sessionPath;
             settingsFileName = this.sessionPath + @"\" + "cam" + this.camNumber.ToString() + @"_cameraSettings.txt";
@@ -110,10 +111,6 @@ namespace FetchRig3
 
         private void DisplayLoop()
         {
-            // Setup StreamDisplayQueue and StreamDisplayThread:
-            ConcurrentQueue<RawMat> streamQueue = new ConcurrentQueue<RawMat>();
-            Thread streamProcessingThread = null;
-
             // Setup EncodeQueue and EncodeThread
             ConcurrentQueue<byte[]> encodeQueue = new ConcurrentQueue<byte[]>();
             Thread encodeThread = null;
@@ -181,16 +178,6 @@ namespace FetchRig3
                         streamImageCtr++;
                         long currFrameID = rawImage.ChunkData.FrameID;
                         long currFrameTimestamp = rawImage.ChunkData.Timestamp;
-
-                        Mat streamImageMat = new Mat(rows: frameSize.Height, cols: frameSize.Width, type: Emgu.CV.CvEnum.DepthType.Cv8U, channels: 1, data: rawImage.DataPtr, step: frameSize.Width);
-                        Mat streamImageMatResized = new Mat(size: streamFrameSize, type: Emgu.CV.CvEnum.DepthType.Cv8U, channels: 1);
-                        CvInvoke.Resize(src: streamImageMat, dst: streamImageMatResized, dsize: streamFrameSize, interpolation: Emgu.CV.CvEnum.Inter.Linear);
-
-                        RawMat matWithMetaData = new RawMat(frameID: currFrameID, frameTimestamp: currFrameTimestamp,
-                                                                              isNewBackgroundImage: true, closeForm: false, rawMat: streamImageMatResized);
-
-                        streamQueue.Enqueue(matWithMetaData);
-                        streamImageMat.Dispose();
                     }
                     continue;
                 }
@@ -214,7 +201,7 @@ namespace FetchRig3
                                 RawMat matWithMetaData = new RawMat(frameID: currFrameID, frameTimestamp: currFrameTimestamp,
                                                                                       isNewBackgroundImage: false, closeForm: false, rawMat: streamImageMatResized);
 
-                                streamQueue.Enqueue(matWithMetaData);
+                                streamOutputQueue.Enqueue(matWithMetaData);
                                 streamImageMat.Dispose();
                             }
                         }
@@ -279,7 +266,7 @@ namespace FetchRig3
                                 RawMat matWithMetaData = new RawMat(frameID: currFrameID, frameTimestamp: currFrameTimestamp,
                                                       isNewBackgroundImage: false, closeForm: false, rawMat: streamImageMatResized);
 
-                                streamQueue.Enqueue(matWithMetaData);
+                                streamOutputQueue.Enqueue(matWithMetaData);
                                 streamImageMat.Dispose();
                             }
                         }
@@ -340,10 +327,6 @@ namespace FetchRig3
                 }
             }
         }
-
-        
-
-
 
         private void EncodeThreadInit(int _camNumber, string _encodePipeName, string _sessionPath, int _count, ConcurrentQueue<byte[]> _encodeQueue)
         {

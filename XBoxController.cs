@@ -32,7 +32,8 @@ namespace FetchRig3
         Y = 4,
         A = 5,
         B = 6,
-        DPadLeft = 7
+        DPadRight = 7,
+        DPadLeft = 8
     }
 
     public enum ButtonCommands
@@ -44,17 +45,18 @@ namespace FetchRig3
         StopRecording = 4,
         PlayRewardTone = 5,
         PlayInitiateTrialTone = 6,
-        Exit = 7
+        ResetBackgroundImage = 7,
+        Exit = 8
     }
 
     public class XBoxController
     {
-        public const int nControllableButtons = 8;
+        public const int nControllableButtons = 9;
         private readonly int nCameras;
         private Form1 mainForm;
         private ConcurrentQueue<ButtonCommands>[] camControlMessageQueues;
         private Controller controller;
-        private ControllerState controllerState;
+        public ControllerState controllerState;
 
         public XBoxController(Form1 mainForm, ConcurrentQueue<ButtonCommands>[] camControlMessageQueues)
         {
@@ -65,12 +67,7 @@ namespace FetchRig3
             controllerState = new ControllerState(this);
         }
 
-        public void Start()
-        {
-            Console.WriteLine("XBox Controller Started");
-        }
-
-        class ControllerState
+        public class ControllerState
         {
             XBoxController xBoxController;
             State state;
@@ -84,6 +81,7 @@ namespace FetchRig3
 
             ButtonCommands[] soundButtons;
             ButtonCommands[] camButtons;
+            ButtonCommands[] displayButtons;
 
             public ControllerState(XBoxController xBoxController)
             {
@@ -117,9 +115,15 @@ namespace FetchRig3
                     ButtonCommands.Exit
                 };
 
+                displayButtons = new ButtonCommands[2]
+                {
+                    ButtonCommands.BeginStreaming,
+                    ButtonCommands.EndStreaming
+                };
+
                 soundQueue = new ConcurrentQueue<ButtonCommands>();
                 soundThread = new Thread(() => this.xBoxController.SoundThreadInit(soundQueue: soundQueue));
-                soundThread.IsBackground = false;
+                soundThread.IsBackground = true;
                 soundThread.Start();
             }
 
@@ -137,24 +141,32 @@ namespace FetchRig3
                     if (prevButtonStates[i] == false && currButtonStates[i] == true)
                     {
                         ButtonCommands buttonCommand = (ButtonCommands)Enum.Parse(typeof(ButtonCommands), controllableButtonCommands[i]);
-                        for (int j = 0; j < camButtons.Length; j++)
+
+                        if (camButtons.Contains(buttonCommand))
                         {
-                            if (buttonCommand == camButtons[j])
+                            for (int j = 0; j < xBoxController.nCameras; j++)
                             {
-                                for (int k = 0; k < xBoxController.nCameras; k++)
-                                {
-                                    ButtonCommands message = buttonCommand;
-                                    xBoxController.camControlMessageQueues[k].Enqueue(message);
-                                }
+                                ButtonCommands message = buttonCommand;
+                                xBoxController.camControlMessageQueues[j].Enqueue(message);
                             }
                         }
 
-                        for (int j = 0; j < soundButtons.Length; j++)
+                        if (soundButtons.Contains(buttonCommand))
                         {
-                            if (buttonCommand == soundButtons[j])
+                            ButtonCommands message = buttonCommand;
+                            Console.WriteLine("{0} message enqueued in soundQueue", message);
+                            soundQueue.Enqueue(message);
+                        }
+
+                        if (displayButtons.Contains(buttonCommand))
+                        {
+                            if (buttonCommand == ButtonCommands.BeginStreaming)
                             {
-                                ButtonCommands message = buttonCommand;
-                                soundQueue.Enqueue(message);
+                                xBoxController.mainForm.isStreaming = true;
+                            }
+                            else if (buttonCommand == ButtonCommands.EndStreaming)
+                            {
+                                xBoxController.mainForm.isStreaming = false;
                             }
                         }
 
@@ -192,6 +204,7 @@ namespace FetchRig3
             System.Timers.Timer soundTimer = new System.Timers.Timer(interval: 100);
             soundTimer.AutoReset = true;
             soundTimer.Elapsed += OnTimedEvent;
+            soundTimer.Enabled = true;
 
             bool isDequeueSuccess;
 
@@ -203,6 +216,7 @@ namespace FetchRig3
                     if (result == ButtonCommands.Exit)
                     {
                         soundTimer.Enabled = false;
+                        Console.WriteLine("soundThread will close");
                         return;
                     }
 

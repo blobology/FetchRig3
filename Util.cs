@@ -274,7 +274,6 @@ namespace FetchRig3
             public readonly Dictionary<OryxSettingName, SettingInfo> standardSetupDict;
             public Dictionary<OryxSettingName, SettingInfo> settingsToLoad;
             public Size maxFramesize { get; }
-
             public Size streamFramesize { get; }
             public bool centerROI { get; set; }
 
