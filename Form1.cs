@@ -29,6 +29,7 @@ namespace FetchRig3
         private int nCameras;
         private Util.OryxSetupInfo[] oryxSetupInfos;
         private ConcurrentQueue<ButtonCommands>[] camControlMessageQueues;
+        public ConcurrentQueue<ButtonCommands> processingThreadMessageQueue;
         private XBoxController xBoxController;
         private string[] sessionPaths;
         private Thread[] oryxCameraThreads;
@@ -137,7 +138,8 @@ namespace FetchRig3
 
             // Initialize thread to merge camera stream data into a single byte array:
             Size _inputImageSize = new Size(width: streamFramesize.Width, height: streamFramesize.Height);
-            mergeStreamsThread = new Thread(() => MergeStreamsThreadInit(inputQueues: streamQueue0, outputQueue: displayQueue, inputImgSize: _inputImageSize));
+            processingThreadMessageQueue = new ConcurrentQueue<ButtonCommands>();
+            mergeStreamsThread = new Thread(() => MergeStreamsThreadInit(inputQueues: streamQueue0, outputQueue: displayQueue, messageQueue: processingThreadMessageQueue, inputImgSize: _inputImageSize));
             mergeStreamsThread.IsBackground = true;
             mergeStreamsThread.Priority = ThreadPriority.Highest;
             mergeStreamsThread.Start();
@@ -180,7 +182,7 @@ namespace FetchRig3
             }
         }
 
-        public void MergeStreamsThreadInit(ConcurrentQueue<RawMat>[] inputQueues, ConcurrentQueue<Tuple<byte[], Mat>> outputQueue, Size inputImgSize)
+        public void MergeStreamsThreadInit(ConcurrentQueue<RawMat>[] inputQueues, ConcurrentQueue<Tuple<byte[], Mat>> outputQueue, ConcurrentQueue<ButtonCommands> messageQueue, Size inputImgSize)
         {
             const int nCameras = 2;
             Size mergeImgSize = new Size(width: inputImgSize.Width, height: inputImgSize.Height * 2);
@@ -189,14 +191,46 @@ namespace FetchRig3
             int mergeImgSizeInBytes = mergeImgSize.Width * mergeImgSize.Height;
 
             bool go = true;
+            ProcessingLoopState loopState = ProcessingLoopState.WaitingForMessages;
+
+            bool resetBackground = false;
             bool[] isDequeueSuccess = new bool[nCameras];
 
             Mat background = new Mat(size: mergeImgSize, type: Emgu.CV.CvEnum.DepthType.Cv8U, channels: 1);
 
             int frameCtr = 0;
 
+            bool isMessageDequeueSuccess;
+
             while (go)
             {
+                isMessageDequeueSuccess = messageQueue.TryDequeue(out ButtonCommands result);
+                if (isMessageDequeueSuccess)
+                {
+                    if (result == ButtonCommands.BeginStreaming)
+                    {
+                        loopState = ProcessingLoopState.WaitingForMessagesWhileProcessing;
+                    }
+                    else if (result == ButtonCommands.EndStreaming)
+                    {
+                        loopState = ProcessingLoopState.WaitingForMessages;
+                    }
+                    else if (result == ButtonCommands.ResetBackgroundImage)
+                    {
+                        resetBackground = true;
+                    }
+                    else if (result == ButtonCommands.Exit)
+                    {
+                        return;
+                    }
+                }
+
+                if (loopState == ProcessingLoopState.WaitingForMessages)
+                {
+                    Thread.Sleep(100);
+                    continue;
+                }
+
                 while (!isDequeueSuccess[0])
                 {
                     isDequeueSuccess[0] = inputQueues[0].TryDequeue(out RawMat result0);
@@ -222,9 +256,10 @@ namespace FetchRig3
                         Mat processedMat = new Mat(size: mergeImgSize, type: Emgu.CV.CvEnum.DepthType.Cv8U, channels: 1);
                         Marshal.Copy(source: outputItem1, startIndex: 0, destination: processedMat.DataPointer, length: mergeImgSizeInBytes);
 
-                        if (frameCtr == 1)
+                        if (frameCtr == 1 || resetBackground)
                         {
                             processedMat.CopyTo(background);
+                            resetBackground = false;
                         }
 
                         ProcessMergedImage(ref processedMat);
@@ -254,6 +289,7 @@ namespace FetchRig3
             {
                 return Tuple.Create(item1, item2);
             }
+
         }
 
         public void ExitButtonPressed()

@@ -82,6 +82,7 @@ namespace FetchRig3
             ButtonCommands[] soundButtons;
             ButtonCommands[] camButtons;
             ButtonCommands[] displayButtons;
+            ButtonCommands[] streamProcessingButtons;
 
             public ControllerState(XBoxController xBoxController)
             {
@@ -121,11 +122,18 @@ namespace FetchRig3
                     ButtonCommands.EndStreaming
                 };
 
+                streamProcessingButtons = new ButtonCommands[4]
+                {
+                    ButtonCommands.BeginStreaming,
+                    ButtonCommands.EndStreaming,
+                    ButtonCommands.ResetBackgroundImage,
+                    ButtonCommands.Exit
+                };
+
                 soundQueue = new ConcurrentQueue<ButtonCommands>();
                 soundThread = new Thread(() => this.xBoxController.SoundThreadInit(soundQueue: soundQueue));
                 soundThread.IsBackground = false;
                 soundThread.Priority = ThreadPriority.Lowest;
-                //soundThread.SetApartmentState(state: ApartmentState.MTA);
                 soundThread.Start();
             }
 
@@ -170,6 +178,12 @@ namespace FetchRig3
                             {
                                 xBoxController.mainForm.isStreaming = false;
                             }
+                        }
+
+                        if (streamProcessingButtons.Contains(buttonCommand))
+                        {
+                            ButtonCommands message = buttonCommand;
+                            xBoxController.mainForm.processingThreadMessageQueue.Enqueue(message);
                         }
 
                         if (buttonCommand == ButtonCommands.Exit)

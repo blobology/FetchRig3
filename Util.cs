@@ -34,6 +34,12 @@ namespace FetchRig3
         Exit
     }
 
+    public enum ProcessingLoopState
+    {
+        WaitingForMessages,
+        WaitingForMessagesWhileProcessing
+    }
+
     public class RawMat
     {
         public long frameID { get; }
