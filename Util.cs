@@ -81,11 +81,6 @@ namespace FetchRig3
             return result;
         }
 
-        public static Tuple<RawMat, Mat> GetRawAndProcessedMat(RawMat rawMat, Mat mat)
-        {
-            return Tuple.Create(rawMat, mat);
-        }
-
         public enum NodeType
         {
             String,

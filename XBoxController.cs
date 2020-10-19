@@ -124,7 +124,7 @@ namespace FetchRig3
                 soundQueue = new ConcurrentQueue<ButtonCommands>();
                 soundThread = new Thread(() => this.xBoxController.SoundThreadInit(soundQueue: soundQueue));
                 soundThread.IsBackground = false;
-                soundThread.Priority = ThreadPriority.Highest;
+                soundThread.Priority = ThreadPriority.Lowest;
                 //soundThread.SetApartmentState(state: ApartmentState.MTA);
                 soundThread.Start();
             }

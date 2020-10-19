@@ -57,7 +57,7 @@ namespace FetchRig3
             frameSize = new Size(width: setupInfo.maxFramesize.Width, height: setupInfo.maxFramesize.Height);
 
             streamFrameSize = this.setupInfo.streamFramesize;
-            streamEnqueueDutyCycle = 4;
+            streamEnqueueDutyCycle = 2;
 
             GetNodeMapsAndInitialize();
             LoadCameraSettings();

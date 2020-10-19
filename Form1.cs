@@ -43,7 +43,7 @@ namespace FetchRig3
         private ConcurrentQueue<RawMat>[] streamQueue0;
         private Thread mergeStreamsThread;
 
-        private ConcurrentQueue<byte[]> displayQueue;
+        private ConcurrentQueue<Tuple<byte[], Mat>> displayQueue;
         private Image<Gray, byte> displayImage;
 
         private System.Windows.Forms.Timer displayTimer;
@@ -129,7 +129,7 @@ namespace FetchRig3
             }
 
             // Initialize queue to send combined images to display form:
-            displayQueue = new ConcurrentQueue<byte[]>();
+            displayQueue = new ConcurrentQueue<Tuple<byte[], Mat>>();
 
             // Initialize Size of camera stream output image and merged image for display:
             streamFramesize = new Size(width: oryxSetupInfos[0].streamFramesize.Width, height: oryxSetupInfos[0].streamFramesize.Height);
@@ -137,7 +137,7 @@ namespace FetchRig3
 
             // Initialize thread to merge camera stream data into a single byte array:
             Size _inputImageSize = new Size(width: streamFramesize.Width, height: streamFramesize.Height);
-            mergeStreamsThread = new Thread(() => MergeStreamsThreadInit(inputQueues: streamQueue0, outputQueue: displayQueue,  inputImgSize: _inputImageSize));
+            mergeStreamsThread = new Thread(() => MergeStreamsThreadInit(inputQueues: streamQueue0, outputQueue: displayQueue, inputImgSize: _inputImageSize));
             mergeStreamsThread.IsBackground = true;
             mergeStreamsThread.Priority = ThreadPriority.Highest;
             mergeStreamsThread.Start();
@@ -147,7 +147,7 @@ namespace FetchRig3
 
             // Initialize Timer:
             displayTimer = new System.Windows.Forms.Timer();
-            displayTimer.Interval = 20;
+            displayTimer.Interval = 5;
             displayTimer.Tick += DisplayTimerEventProcessor;
             displayTimer.Enabled = true;
         }
@@ -159,21 +159,28 @@ namespace FetchRig3
 
             while (isStreaming)
             {
-                isDequeueSuccess = displayQueue.TryDequeue(out byte[] result);
+                isDequeueSuccess = displayQueue.TryDequeue(out Tuple<byte[], Mat> result);
                 if (isDequeueSuccess)
                 {
-                    IntPtr unmanagedPointer = Marshal.AllocHGlobal(result.Length);
-                    Marshal.Copy(source: result, startIndex: 0, destination: unmanagedPointer, length: result.Length);
-                    Mat mat = new Mat(size: displayFramesize, type: Emgu.CV.CvEnum.DepthType.Cv8U, channels: 1, data: unmanagedPointer, step: displayFramesize.Width);
-                    mergedImgBox0.Image = mat;
-                    mat.Dispose();
-                    Marshal.FreeHGlobal(unmanagedPointer);
+                    displayTimer.Enabled = false;
+                    IntPtr unmanagedPointerItem1 = Marshal.AllocHGlobal(result.Item1.Length);
+                    Marshal.Copy(source: result.Item1, startIndex: 0, destination: unmanagedPointerItem1, length: result.Item1.Length);
+                    Mat matItem1 = new Mat(size: displayFramesize, type: Emgu.CV.CvEnum.DepthType.Cv8U, channels: 1, data: unmanagedPointerItem1, step: displayFramesize.Width);
+
+                    mergedImgBox0.Image = matItem1;
+                    matItem1.Dispose();
+                    Marshal.FreeHGlobal(unmanagedPointerItem1);
+
+                    mergedImgBox1.Image = result.Item2;
+                    result.Item2.Dispose();
+
+                    displayTimer.Enabled = true;
                     return;
                 }
             }
         }
 
-        public void MergeStreamsThreadInit(ConcurrentQueue<RawMat>[] inputQueues, ConcurrentQueue<byte[]> outputQueue, Size inputImgSize)
+        public void MergeStreamsThreadInit(ConcurrentQueue<RawMat>[] inputQueues, ConcurrentQueue<Tuple<byte[], Mat>> outputQueue, Size inputImgSize)
         {
             const int nCameras = 2;
             Size mergeImgSize = new Size(width: inputImgSize.Width, height: inputImgSize.Height * 2);
@@ -183,6 +190,10 @@ namespace FetchRig3
 
             bool go = true;
             bool[] isDequeueSuccess = new bool[nCameras];
+
+            Mat background = new Mat(size: mergeImgSize, type: Emgu.CV.CvEnum.DepthType.Cv8U, channels: 1);
+
+            int frameCtr = 0;
 
             while (go)
             {
@@ -202,9 +213,24 @@ namespace FetchRig3
                             continue;
                         }
 
-                        byte[] output = new byte[mergeImgSizeInBytes];
-                        Marshal.Copy(source: result0.rawMat.DataPointer, destination: output, startIndex: 0, length: inputImgSizeInBytes);
-                        Marshal.Copy(source: result1.rawMat.DataPointer, destination: output, startIndex: inputImgSizeInBytes, length: inputImgSizeInBytes);
+                        frameCtr++;
+                        
+                        byte[] outputItem1 = new byte[mergeImgSizeInBytes];
+                        Marshal.Copy(source: result0.rawMat.DataPointer, destination: outputItem1, startIndex: 0, length: inputImgSizeInBytes);
+                        Marshal.Copy(source: result1.rawMat.DataPointer, destination: outputItem1, startIndex: inputImgSizeInBytes, length: inputImgSizeInBytes);
+
+                        Mat processedMat = new Mat(size: mergeImgSize, type: Emgu.CV.CvEnum.DepthType.Cv8U, channels: 1);
+                        Marshal.Copy(source: outputItem1, startIndex: 0, destination: processedMat.DataPointer, length: mergeImgSizeInBytes);
+
+                        if (frameCtr == 1)
+                        {
+                            processedMat.CopyTo(background);
+                        }
+
+                        ProcessMergedImage(ref processedMat);
+
+
+                        Tuple<byte[], Mat> output = GetOutput(item1: outputItem1, item2: processedMat);
 
                         outputQueue.Enqueue(item: output);
                         result0.rawMat.Dispose();
@@ -216,6 +242,17 @@ namespace FetchRig3
                     }
                     break;
                 }
+            }
+
+            void ProcessMergedImage(ref Mat mat)
+            {
+                CvInvoke.AbsDiff(src1: mat, src2: background, dst: mat);
+                CvInvoke.Threshold(src: mat, dst: mat, threshold: 15, maxValue: 255, thresholdType: Emgu.CV.CvEnum.ThresholdType.Binary);
+            }
+
+            Tuple<byte[], Mat> GetOutput(byte[] item1, Mat item2)
+            {
+                return Tuple.Create(item1, item2);
             }
         }
 
