@@ -123,6 +123,8 @@ namespace FetchRig3
 
                 oryxCameraThreads[i] = new Thread(() => new OryxCamera(camNumber: _i, managedCamera: managedCameras[_i], camControlMessageQueue: camControlMessageQueues[_i],
                     streamOutputQueue: streamQueue0[_i], setupInfo: oryxSetupInfos[_i], sessionPath: _sessionPath));
+                oryxCameraThreads[i].IsBackground = false;
+                oryxCameraThreads[i].Priority = ThreadPriority.Highest;
                 oryxCameraThreads[i].Start();
             }
 
@@ -137,6 +139,7 @@ namespace FetchRig3
             Size _inputImageSize = new Size(width: streamFramesize.Width, height: streamFramesize.Height);
             mergeStreamsThread = new Thread(() => MergeStreamsThreadInit(inputQueues: streamQueue0, outputQueue: displayQueue,  inputImgSize: _inputImageSize));
             mergeStreamsThread.IsBackground = true;
+            mergeStreamsThread.Priority = ThreadPriority.Highest;
             mergeStreamsThread.Start();
 
             // Initialize streaming state
@@ -144,7 +147,7 @@ namespace FetchRig3
 
             // Initialize Timer:
             displayTimer = new System.Windows.Forms.Timer();
-            displayTimer.Interval = 2;
+            displayTimer.Interval = 20;
             displayTimer.Tick += DisplayTimerEventProcessor;
             displayTimer.Enabled = true;
         }
@@ -152,7 +155,6 @@ namespace FetchRig3
         public void DisplayTimerEventProcessor(Object sender, EventArgs e)
         {
             xBoxController.controllerState.Update();
-
             bool isDequeueSuccess;
 
             while (isStreaming)
@@ -220,6 +222,14 @@ namespace FetchRig3
         public void ExitButtonPressed()
         {
             Console.WriteLine("Exit Button was pressed");
+            xBoxController.controllerState.soundThread.Join();
+            Console.WriteLine("soundThread has joined");
+
+            for (int i = 0; i < nCameras; i++)
+            {
+                oryxCameraThreads[i].Join();
+                Console.WriteLine("camera number {0} thread has joined", i.ToString());
+            }
         }
     }
 }

@@ -57,7 +57,7 @@ namespace FetchRig3
             frameSize = new Size(width: setupInfo.maxFramesize.Width, height: setupInfo.maxFramesize.Height);
 
             streamFrameSize = this.setupInfo.streamFramesize;
-            streamEnqueueDutyCycle = 2;
+            streamEnqueueDutyCycle = 4;
 
             GetNodeMapsAndInitialize();
             LoadCameraSettings();
@@ -92,7 +92,7 @@ namespace FetchRig3
             {
                 _pipeName = @"\\.\pipe\" + pipeName;
                 _videoFileName = videoFileName;
-                inputArgs = "-nostats -y -vsync 0 -f rawvideo -s 3208x2200 -pix_fmt gray -framerate 100 -i " + _pipeName + " -an";
+                inputArgs = "-nostats -y -vsync 0 -f rawvideo -s 3208x2200 -pix_fmt gray -framerate 100 -i " + _pipeName + " -an -sn";
                 outputArgs = "-gpu 0 -vcodec h264_nvenc -r 100 -preset fast -qp 20 " + _videoFileName;
                 fullArgs = inputArgs + " " + outputArgs;
             }

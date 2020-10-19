@@ -77,7 +77,7 @@ namespace FetchRig3
             string[] controllableButtonNames;
             string[] controllableButtonCommands;
             ConcurrentQueue<ButtonCommands> soundQueue;
-            Thread soundThread;
+            public Thread soundThread;
 
             ButtonCommands[] soundButtons;
             ButtonCommands[] camButtons;
@@ -123,7 +123,9 @@ namespace FetchRig3
 
                 soundQueue = new ConcurrentQueue<ButtonCommands>();
                 soundThread = new Thread(() => this.xBoxController.SoundThreadInit(soundQueue: soundQueue));
-                soundThread.IsBackground = true;
+                soundThread.IsBackground = false;
+                soundThread.Priority = ThreadPriority.Highest;
+                //soundThread.SetApartmentState(state: ApartmentState.MTA);
                 soundThread.Start();
             }
 
@@ -190,8 +192,8 @@ namespace FetchRig3
 
             string[] soundFiles = new string[nSounds]
             {
-                @"C:\CSharpProjects\FetchRig2\sounds\dingdingding.wav",
-                @"C:\CSharpProjects\FetchRig2\sounds\money.wav"
+                @"C:\sounds\dingdingding.wav",
+                @"C:\sounds\money.wav"
             };
 
             SoundPlayer[] soundPlayers = new SoundPlayer[nSounds];
