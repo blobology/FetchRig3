@@ -193,7 +193,7 @@ namespace FetchRig3
             bool go = true;
             ProcessingLoopState loopState = ProcessingLoopState.WaitingForMessages;
 
-            bool resetBackground = false;
+            bool resetBackground = true;
             bool[] isDequeueSuccess = new bool[nCameras];
 
             Mat background = new Mat(size: mergeImgSize, type: Emgu.CV.CvEnum.DepthType.Cv8U, channels: 1);
@@ -201,6 +201,7 @@ namespace FetchRig3
             int frameCtr = 0;
 
             bool isMessageDequeueSuccess;
+            
 
             while (go)
             {
@@ -247,8 +248,6 @@ namespace FetchRig3
                             continue;
                         }
 
-                        frameCtr++;
-                        
                         byte[] outputItem1 = new byte[mergeImgSizeInBytes];
                         Marshal.Copy(source: result0.rawMat.DataPointer, destination: outputItem1, startIndex: 0, length: inputImgSizeInBytes);
                         Marshal.Copy(source: result1.rawMat.DataPointer, destination: outputItem1, startIndex: inputImgSizeInBytes, length: inputImgSizeInBytes);
@@ -256,7 +255,7 @@ namespace FetchRig3
                         Mat processedMat = new Mat(size: mergeImgSize, type: Emgu.CV.CvEnum.DepthType.Cv8U, channels: 1);
                         Marshal.Copy(source: outputItem1, startIndex: 0, destination: processedMat.DataPointer, length: mergeImgSizeInBytes);
 
-                        if (frameCtr == 1 || resetBackground)
+                        if (resetBackground)
                         {
                             processedMat.CopyTo(background);
                             resetBackground = false;
@@ -264,6 +263,7 @@ namespace FetchRig3
 
                         ProcessMergedImage(ref processedMat);
 
+                        
 
                         Tuple<byte[], Mat> output = GetOutput(item1: outputItem1, item2: processedMat);
 
