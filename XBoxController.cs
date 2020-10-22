@@ -33,7 +33,8 @@ namespace FetchRig3
         A = 5,
         B = 6,
         DPadRight = 7,
-        DPadLeft = 8
+        DPadLeft = 8,
+        DPadDown = 9
     }
 
     public enum ButtonCommands
@@ -46,12 +47,13 @@ namespace FetchRig3
         PlayRewardTone = 5,
         PlayInitiateTrialTone = 6,
         ResetBackgroundImage = 7,
-        Exit = 8
+        Exit = 8,
+        SaveThisImageFromProcessingStream = 9
     }
 
     public class XBoxController
     {
-        public const int nControllableButtons = 9;
+        public const int nControllableButtons = 10;
         private readonly int nCameras;
         private Form1 mainForm;
         private ConcurrentQueue<ButtonCommands>[] camControlMessageQueues;
@@ -122,12 +124,13 @@ namespace FetchRig3
                     ButtonCommands.EndStreaming
                 };
 
-                streamProcessingButtons = new ButtonCommands[4]
+                streamProcessingButtons = new ButtonCommands[5]
                 {
                     ButtonCommands.BeginStreaming,
                     ButtonCommands.EndStreaming,
                     ButtonCommands.ResetBackgroundImage,
-                    ButtonCommands.Exit
+                    ButtonCommands.Exit,
+                    ButtonCommands.SaveThisImageFromProcessingStream
                 };
 
                 soundQueue = new ConcurrentQueue<ButtonCommands>();

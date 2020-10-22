@@ -37,7 +37,8 @@ namespace FetchRig3
     public enum ProcessingLoopState
     {
         WaitingForMessages,
-        WaitingForMessagesWhileProcessing
+        WaitingForMessagesWhileProcessing,
+        SaveNextImageToDisk
     }
 
     public class RawMat

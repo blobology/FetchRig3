@@ -198,29 +198,11 @@ namespace FetchRig3
 
             Mat background = new Mat(size: mergeImgSize, type: Emgu.CV.CvEnum.DepthType.Cv8U, channels: 1);
 
+            int saveImgCtr = 0;
+            string saveImgPath = @"D:\ChessBoardImages\";
+
             bool isMessageDequeueSuccess;
-
-            Matrix<double> K = new Matrix<double>(rows: 3, cols: 3);
-            K.SetZero();
-
-            double fx = 23.416 / 4.0;   // focal length in pixels
-            double fy = 23.416 / 4.0;
-            double cx = 401.0;
-            double cy = 275.0;
-
-            K[0, 0] = fx;
-            K[0, 2] = cx;
-            K[1, 1] = fy;
-            K[1, 2] = cy;
-            K[2, 2] = 1.0;
-
-            Matrix<double> D = new Matrix<double>(rows: 4, cols: 1);
-
-            D.SetZero();
-            D[2, 0] = -0.0002;
-            D[3, 0] = -0.0002;
             
-
             while (go)
             {
                 isMessageDequeueSuccess = messageQueue.TryDequeue(out ButtonCommands result);
@@ -237,6 +219,10 @@ namespace FetchRig3
                     else if (result == ButtonCommands.ResetBackgroundImage)
                     {
                         resetBackground = true;
+                    }
+                    else if (result == ButtonCommands.SaveThisImageFromProcessingStream)
+                    {
+                        loopState = ProcessingLoopState.SaveNextImageToDisk;
                     }
                     else if (result == ButtonCommands.Exit)
                     {
@@ -270,17 +256,18 @@ namespace FetchRig3
                         Marshal.Copy(source: result0.rawMat.DataPointer, destination: outputItem1, startIndex: 0, length: inputImgSizeInBytes);
                         Marshal.Copy(source: result1.rawMat.DataPointer, destination: outputItem1, startIndex: inputImgSizeInBytes, length: inputImgSizeInBytes);
 
+                        if (loopState == ProcessingLoopState.SaveNextImageToDisk)
+                        {
+                            Image<Gray, byte> img = result0.rawMat.ToImage<Gray, byte>();
 
-                        Mat undistort0 = new Mat(size: inputImgSize, type: Emgu.CV.CvEnum.DepthType.Cv8U, channels: 1);
-                        Mat undistort1 = new Mat(size: inputImgSize, type: Emgu.CV.CvEnum.DepthType.Cv8U, channels: 1);
-
-                        CvInvoke.Undistort(src: result0.rawMat, dst: undistort0, cameraMatrix: K, distortionCoeffs: D);
-                        CvInvoke.Undistort(src: result1.rawMat, dst: undistort1, cameraMatrix: K, distortionCoeffs: D);
+                            saveImgCtr++;
+                            string imageFileName = saveImgPath + saveImgCtr.ToString() + @".png";
+                            img.Save(fileName: imageFileName);
+                            loopState = ProcessingLoopState.WaitingForMessagesWhileProcessing;
+                        }
 
                         Mat processedMat = new Mat(size: mergeImgSize, type: Emgu.CV.CvEnum.DepthType.Cv8U, channels: 1);
-
-                        CvInvoke.VConcat(src1: undistort0, src2: undistort1, dst: processedMat);
-                        //Marshal.Copy(source: outputItem1, startIndex: 0, destination: processedMat.DataPointer, length: mergeImgSizeInBytes);
+                        Marshal.Copy(source: outputItem1, startIndex: 0, destination: processedMat.DataPointer, length: mergeImgSizeInBytes);
 
                         if (resetBackground)
                         {
@@ -288,7 +275,7 @@ namespace FetchRig3
                             resetBackground = false;
                         }
 
-                        //ProcessMergedImage(ref processedMat);
+                        ProcessMergedImage(ref processedMat);
 
                         Tuple<byte[], Mat> output = GetOutput(item1: outputItem1, item2: processedMat);
 
@@ -304,8 +291,6 @@ namespace FetchRig3
                 }
             }
 
-
-
             void ProcessMergedImage(ref Mat mat)
             {
                 CvInvoke.AbsDiff(src1: mat, src2: background, dst: mat);
@@ -316,7 +301,6 @@ namespace FetchRig3
             {
                 return Tuple.Create(item1, item2);
             }
-
         }
 
         public void ExitButtonPressed()
