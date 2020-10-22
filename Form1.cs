@@ -294,7 +294,7 @@ namespace FetchRig3
             void ProcessMergedImage(ref Mat mat)
             {
                 CvInvoke.AbsDiff(src1: mat, src2: background, dst: mat);
-                CvInvoke.Threshold(src: mat, dst: mat, threshold: 15, maxValue: 255, thresholdType: Emgu.CV.CvEnum.ThresholdType.Binary);
+                CvInvoke.Threshold(src: mat, dst: mat, threshold: 28, maxValue: 255, thresholdType: Emgu.CV.CvEnum.ThresholdType.Binary);
             }
 
             Tuple<byte[], Mat> GetOutput(byte[] item1, Mat item2)

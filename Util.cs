@@ -422,13 +422,13 @@ namespace FetchRig3
                     new SettingInfo(OryxSettingName.ExposureMode, NodeType.Enumeration, NodeMap.GenICam, value: nameof(ExposureMode.Timed)));
 
                 standardSetupDict.Add(OryxSettingName.ExposureTime,
-                    new SettingInfo(OryxSettingName.ExposureTime, NodeType.Float, NodeMap.GenICam, value: "1200.0"));
+                    new SettingInfo(OryxSettingName.ExposureTime, NodeType.Float, NodeMap.GenICam, value: "1250.0"));
 
                 standardSetupDict.Add(OryxSettingName.GainAuto,
                     new SettingInfo(OryxSettingName.GainAuto, NodeType.Enumeration, NodeMap.GenICam, value: nameof(GainAuto.Off)));
 
                 standardSetupDict.Add(OryxSettingName.Gain,
-                    new SettingInfo(OryxSettingName.Gain, NodeType.Float, NodeMap.GenICam, value: "16.0"));
+                    new SettingInfo(OryxSettingName.Gain, NodeType.Float, NodeMap.GenICam, value: "19.0"));
 
                 standardSetupDict.Add(OryxSettingName.GammaEnable,
                     new SettingInfo(OryxSettingName.GammaEnable, NodeType.Bool, NodeMap.GenICam, value: "False"));
