@@ -20,6 +20,7 @@ using System.Runtime.CompilerServices;
 using System.Media;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Policy;
+using System.IO.Ports;
 
 namespace FetchRig3
 {
@@ -59,6 +60,8 @@ namespace FetchRig3
         private ConcurrentQueue<ButtonCommands>[] camControlMessageQueues;
         private Controller controller;
         public ControllerState controllerState;
+        private string serialPortName = "COM3";
+        private SerialPort serialPort;
 
         public XBoxController(Form1 mainForm, ConcurrentQueue<ButtonCommands>[] camControlMessageQueues)
         {
@@ -66,6 +69,8 @@ namespace FetchRig3
             this.camControlMessageQueues = camControlMessageQueues;
             controller = new Controller(userIndex: UserIndex.One);
             nCameras = camControlMessageQueues.Length;
+            serialPort = new SerialPort(portName: serialPortName, baudRate: 115200, parity: Parity.None, dataBits: 8, stopBits: StopBits.One);
+            serialPort.Open();
             controllerState = new ControllerState(this);
         }
 
@@ -78,8 +83,6 @@ namespace FetchRig3
             GamepadButtonFlags[] gamepadButtonFlags;
             string[] controllableButtonNames;
             string[] controllableButtonCommands;
-            ConcurrentQueue<ButtonCommands> soundQueue;
-            public Thread soundThread;
 
             ButtonCommands[] soundButtons;
             ButtonCommands[] camButtons;
@@ -132,12 +135,6 @@ namespace FetchRig3
                     ButtonCommands.Exit,
                     ButtonCommands.SaveThisImageFromProcessingStream
                 };
-
-                soundQueue = new ConcurrentQueue<ButtonCommands>();
-                soundThread = new Thread(() => this.xBoxController.SoundThreadInit(soundQueue: soundQueue));
-                soundThread.IsBackground = false;
-                soundThread.Priority = ThreadPriority.Lowest;
-                soundThread.Start();
             }
 
             public void Update()
@@ -166,9 +163,23 @@ namespace FetchRig3
 
                         if (soundButtons.Contains(buttonCommand))
                         {
-                            ButtonCommands message = buttonCommand;
-                            Console.WriteLine("{0} message enqueued in soundQueue", message);
-                            soundQueue.Enqueue(message);
+                            string message;
+                            if (buttonCommand == ButtonCommands.PlayInitiateTrialTone)
+                            {
+                                message = "initiate_trial";
+                                xBoxController.serialPort.Write(text: message);
+                            }
+                            else if (buttonCommand == ButtonCommands.PlayRewardTone)
+                            {
+                                message = "reward";
+                                xBoxController.serialPort.Write(text: message);
+                            }
+                            else if (buttonCommand == ButtonCommands.Exit)
+                            {
+                                message = "exit";
+                                xBoxController.serialPort.Write(text: message);
+                                xBoxController.serialPort.Close();
+                            }
                         }
 
                         if (displayButtons.Contains(buttonCommand))
@@ -192,61 +203,6 @@ namespace FetchRig3
                         if (buttonCommand == ButtonCommands.Exit)
                         {
                             xBoxController.mainForm.ExitButtonPressed();
-                        }
-                    }
-                }
-            }
-        }
-
-        public void SoundThreadInit(ConcurrentQueue<ButtonCommands> soundQueue)
-        {
-            const int nSounds = 2;
-            ButtonCommands[] buttonsWithSounds = new ButtonCommands[nSounds]
-            {
-                ButtonCommands.PlayInitiateTrialTone,
-                ButtonCommands.PlayRewardTone
-            };
-
-            string[] soundFiles = new string[nSounds]
-            {
-                @"C:\sounds\dingdingding.wav",
-                @"C:\sounds\money.wav"
-            };
-
-            SoundPlayer[] soundPlayers = new SoundPlayer[nSounds];
-
-            for (int i = 0; i < nSounds; i++)
-            {
-                soundPlayers[i] = new SoundPlayer(soundLocation: soundFiles[i]);
-            }
-
-            System.Timers.Timer soundTimer = new System.Timers.Timer(interval: 100);
-            soundTimer.AutoReset = true;
-            soundTimer.Elapsed += OnTimedEvent;
-            soundTimer.Enabled = true;
-
-            bool isDequeueSuccess;
-
-            void OnTimedEvent(Object sender, EventArgs e)
-            {
-                isDequeueSuccess = soundQueue.TryDequeue(out ButtonCommands result);
-                if (isDequeueSuccess)
-                {
-                    if (result == ButtonCommands.Exit)
-                    {
-                        soundTimer.Enabled = false;
-                        Console.WriteLine("soundThread will close");
-                        return;
-                    }
-
-                    for (int i = 0; i < nSounds; i++)
-                    {
-                        if (result == buttonsWithSounds[i])
-                        {
-                            soundTimer.Enabled = false;
-                            soundPlayers[i].PlaySync();
-                            soundTimer.Enabled = true;
-                            break;
                         }
                     }
                 }

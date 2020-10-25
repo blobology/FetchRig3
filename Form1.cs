@@ -306,8 +306,6 @@ namespace FetchRig3
         public void ExitButtonPressed()
         {
             Console.WriteLine("Exit Button was pressed");
-            xBoxController.controllerState.soundThread.Join();
-            Console.WriteLine("soundThread has joined");
 
             for (int i = 0; i < nCameras; i++)
             {
